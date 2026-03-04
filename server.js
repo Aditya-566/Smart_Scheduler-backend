@@ -3,12 +3,15 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import { fileURLToPath } from 'url';
+import path from 'path';
 import connectDB from './config/db.js';
 import { notFound, errorHandler } from './middlewares/errorMiddleware.js';
 import authRoutes from './routes/authRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
 
-dotenv.config();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 // Connect to database
 connectDB();
