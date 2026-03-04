@@ -20,11 +20,34 @@ const app = express();
 
 // Middlewares
 app.use(express.json());
+
+// CORS Configuration - Must come before helmet
 const corsOptions = {
-    origin: process.env.FRONTEND_URL || '*',
+    origin: [
+        'https://smartschedulerfrontend.vercel.app',
+        'https://smart-scheduler-frontend.vercel.app',
+        'https://smart-scheduler-fontend.vercel.app',
+        'https://smart-scheduler-fontend-afxiufk17.vercel.app',
+        'http://localhost:3000',
+        'http://localhost:5173',
+        process.env.FRONTEND_URL || '*'
+    ],
+    credentials: true,
+    optionsSuccessStatus: 200,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    exposedHeaders: ['Content-Length'],
+    maxAge: 86400
 };
+
 app.use(cors(corsOptions));
-app.use(helmet());
+
+// Helmet for security (after CORS)
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
+
+// Morgan logging middleware
 if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
 }
