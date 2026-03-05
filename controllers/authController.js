@@ -92,7 +92,7 @@ const googleLogin = asyncHandler(async (req, res) => {
     // Verify Google token
     const ticket = await client.verifyIdToken({
         idToken: credential,
-        audience: process.env.GOOGLE_CLIENT_ID || '275707803562-8gdalgbaan6ka0h1tcscbl54k60303qi.apps.googleusercontent.com',
+        audience: process.env.GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
     const { email, name, sub: googleId } = payload;
@@ -144,9 +144,12 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
     await user.save({ validateBeforeSave: false });
 
-    // Create reset URL (This should ideally match frontend URL, assuming localhost:5173 for local dev for now, but usually should come from env)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const resetUrl = `${frontendUrl}/resetpassword/${resetToken}`;
+    // Create reset URL
+    const frontendUrl = process.env.FRONTEND_URL;
+    if (!frontendUrl) {
+        console.warn('Missing FRONTEND_URL environment variable. Falling back to localhost');
+    }
+    const resetUrl = `${frontendUrl || 'http://localhost:5173'}/resetpassword/${resetToken}`;
 
     const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please make a PUT request to: \n\n ${resetUrl}`;
 
