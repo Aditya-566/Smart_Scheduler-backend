@@ -3,6 +3,9 @@ import Schedule from '../models/Schedule.js';
 import { createManualSchedule, generateAutoSchedule } from '../services/scheduleService.js';
 import Department from '../models/Department.js';
 import Room from '../models/Room.js';
+import User from '../models/User.js';
+import Course from '../models/Course.js';
+import TimeSlot from '../models/TimeSlot.js';
 
 // @desc    Get all schedules
 // @route   GET /api/schedules
@@ -62,4 +65,23 @@ export const getDepartments = asyncHandler(async (req, res) => {
 export const getRooms = asyncHandler(async (req, res) => {
     const rooms = await Room.find({});
     res.json(rooms);
+});
+
+// @desc    Get dashboard stats
+// @route   GET /api/schedules/stats
+// @access  Private/Admin
+export const getStats = asyncHandler(async (req, res) => {
+    const [totalUsers, activeCourses, availableRooms, weeklySlots] = await Promise.all([
+        User.countDocuments({}),
+        Course.countDocuments({}),
+        Room.countDocuments({}),
+        TimeSlot.countDocuments({ isActive: true })
+    ]);
+
+    res.json({
+        totalUsers,
+        activeCourses,
+        availableRooms,
+        weeklySlots
+    });
 });

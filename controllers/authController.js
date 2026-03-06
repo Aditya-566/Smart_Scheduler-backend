@@ -167,4 +167,12 @@ const resetPassword = asyncHandler(async (req, res) => {
     });
 });
 
-export { registerUser, loginUser, getMe, forgotPassword, resetPassword };
+// @desc    Get all users (Admin)
+// @route   GET /api/auth/users
+// @access  Private/Admin
+const getUsers = asyncHandler(async (req, res) => {
+    const users = await User.find({}).select('-password');
+    res.json(users);
+});
+
+export { registerUser, loginUser, getMe, forgotPassword, resetPassword, getUsers };
