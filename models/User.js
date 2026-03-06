@@ -19,21 +19,11 @@ const userSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: [
-            function () {
-                // Password is required if the user doesn't have a googleId
-                return !this.googleId;
-            },
-            'Please add a password'
-        ],
+        required: [true, 'Please add a password'],
         minlength: 6,
         select: false
     },
-    googleId: {
-        type: String,
-        unique: true,
-        sparse: true
-    },
+
     role: {
         type: String,
         enum: ['ADMIN', 'FACULTY', 'STUDENT'],

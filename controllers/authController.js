@@ -2,9 +2,6 @@ import asyncHandler from 'express-async-handler';
 import crypto from 'crypto';
 import User from '../models/User.js';
 import sendEmail from '../utils/sendEmail.js';
-import { OAuth2Client } from 'google-auth-library';
-
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -83,45 +80,6 @@ const getMe = asyncHandler(async (req, res) => {
     }
 });
 
-// @desc    Auth user via Google & get token
-// @route   POST /api/auth/google
-// @access  Public
-const googleLogin = asyncHandler(async (req, res) => {
-    const { credential } = req.body;
-
-    // Verify Google token
-    const ticket = await client.verifyIdToken({
-        idToken: credential,
-        audience: process.env.GOOGLE_CLIENT_ID,
-    });
-    const payload = ticket.getPayload();
-    const { email, name, sub: googleId } = payload;
-
-    // Check if user exists
-    let user = await User.findOne({ email });
-
-    if (!user) {
-        // Create user if not exists
-        user = await User.create({
-            name,
-            email,
-            googleId,
-            role: 'STUDENT'
-        });
-    } else if (!user.googleId) {
-        // Link googleId to existing user
-        user.googleId = googleId;
-        await user.save({ validateBeforeSave: false });
-    }
-
-    res.json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        token: user.getSignedJwtToken(),
-    });
-});
 
 // @desc    Forgot password
 // @route   POST /api/auth/forgotpassword
@@ -134,10 +92,6 @@ const forgotPassword = asyncHandler(async (req, res) => {
         throw new Error('There is no user with that email');
     }
 
-    if (user.googleId && !user.password) {
-        res.status(400);
-        throw new Error('This account uses Google Login. Please sign in with Google.');
-    }
 
     // Get reset token
     const resetToken = user.getResetPasswordToken();
@@ -208,4 +162,4 @@ const resetPassword = asyncHandler(async (req, res) => {
     });
 });
 
-export { registerUser, loginUser, getMe, googleLogin, forgotPassword, resetPassword };
+export { registerUser, loginUser, getMe, forgotPassword, resetPassword };
