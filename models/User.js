@@ -17,6 +17,20 @@ const userSchema = new mongoose.Schema({
             'Please add a valid email'
         ]
     },
+    loginId: {
+        type: String,
+        required: [true, 'Please add a login ID'],
+        unique: true,
+        validate: {
+            validator: function(v) {
+                if (this.role === 'ADMIN') return /^AD\d{5}$/.test(v);
+                if (this.role === 'FACULTY') return /^F\d{4}$/.test(v);
+                if (this.role === 'STUDENT') return /^SD\d{10}$/.test(v);
+                return false;
+            },
+            message: props => `${props.value} is not a valid login ID for the expected format (AD+5, F+4, SD+10)`
+        }
+    },
     password: {
         type: String,
         required: [true, 'Please add a password'],

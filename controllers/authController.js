@@ -7,18 +7,19 @@ import sendEmail from '../utils/sendEmail.js';
 // @route   POST /api/auth/register
 // @access  Public
 const registerUser = asyncHandler(async (req, res) => {
-    const { name, email, password, role, department } = req.body;
+    const { name, email, loginId, password, role, department } = req.body;
 
-    const userExists = await User.findOne({ email });
+    const userExists = await User.findOne({ $or: [{ email }, { loginId }] });
 
     if (userExists) {
         res.status(400);
-        throw new Error('User already exists');
+        throw new Error('User already exists with that email or login ID');
     }
 
     const user = await User.create({
         name,
         email,
+        loginId,
         password,
         role: role || 'STUDENT',
         department
@@ -29,6 +30,7 @@ const registerUser = asyncHandler(async (req, res) => {
             _id: user._id,
             name: user.name,
             email: user.email,
+            loginId: user.loginId,
             role: user.role,
             token: user.getSignedJwtToken(),
         });
@@ -42,22 +44,23 @@ const registerUser = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/login
 // @access  Public
 const loginUser = asyncHandler(async (req, res) => {
-    const { email, password } = req.body;
+    const { loginId, password } = req.body;
 
     // Check for user
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ loginId }).select('+password');
 
     if (user && (await user.matchPassword(password))) {
         res.json({
             _id: user._id,
             name: user.name,
             email: user.email,
+            loginId: user.loginId,
             role: user.role,
             token: user.getSignedJwtToken(),
         });
     } else {
         res.status(401);
-        throw new Error('Invalid email or password');
+        throw new Error('Invalid login ID or password');
     }
 });
 
@@ -72,6 +75,7 @@ const getMe = asyncHandler(async (req, res) => {
             _id: user._id,
             name: user.name,
             email: user.email,
+            loginId: user.loginId,
             role: user.role,
         });
     } else {
@@ -157,6 +161,7 @@ const resetPassword = asyncHandler(async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        loginId: user.loginId,
         role: user.role,
         token: user.getSignedJwtToken(),
     });

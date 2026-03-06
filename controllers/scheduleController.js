@@ -1,6 +1,8 @@
 import asyncHandler from 'express-async-handler';
 import Schedule from '../models/Schedule.js';
 import { createManualSchedule, generateAutoSchedule } from '../services/scheduleService.js';
+import Department from '../models/Department.js';
+import Room from '../models/Room.js';
 
 // @desc    Get all schedules
 // @route   GET /api/schedules
@@ -36,10 +38,28 @@ export const createSchedule = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 export const autoGenerateSchedule = asyncHandler(async (req, res) => {
     const { departmentId } = req.params;
-    const result = await generateAutoSchedule(departmentId);
+    const constraints = req.body; // e.g. { availableRooms: [], maxClassesPerDay: 4 }
+    
+    const result = await generateAutoSchedule(departmentId, constraints);
     res.status(201).json({
         message: 'Auto-scheduling completed successfully',
         count: result.length,
         schedules: result
     });
+});
+
+// @desc    Get all departments
+// @route   GET /api/schedules/departments
+// @access  Private/Admin
+export const getDepartments = asyncHandler(async (req, res) => {
+    const departments = await Department.find({});
+    res.json(departments);
+});
+
+// @desc    Get all rooms
+// @route   GET /api/schedules/rooms
+// @access  Private/Admin
+export const getRooms = asyncHandler(async (req, res) => {
+    const rooms = await Room.find({});
+    res.json(rooms);
 });
