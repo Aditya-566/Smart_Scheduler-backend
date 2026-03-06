@@ -7,7 +7,14 @@ import { createManualSchedule, generateAutoSchedule } from '../services/schedule
 // @access  Private (Admin/Faculty/Student)
 export const getSchedules = asyncHandler(async (req, res) => {
     // Filter by role or query params if needed
-    const schedules = await Schedule.find()
+    let filter = {};
+
+    // If user is a Faculty, they only see their own schedules
+    if (req.user && req.user.role === 'FACULTY') {
+        filter.faculty = req.user._id;
+    }
+
+    const schedules = await Schedule.find(filter)
         .populate('course', 'name code')
         .populate('room', 'number type capacity')
         .populate('faculty', 'name email')

@@ -24,10 +24,6 @@ app.use(express.json());
 // CORS Configuration - Must come before helmet
 const corsOptions = {
     origin: [
-        'https://smartschedulerfrontend.vercel.app',
-        'https://smart-scheduler-frontend.vercel.app',
-        'https://smart-scheduler-fontend.vercel.app',
-        'https://smart-scheduler-fontend-afxiufk17.vercel.app',
         'http://localhost:3000',
         'http://localhost:5173',
         process.env.FRONTEND_URL || '*'
