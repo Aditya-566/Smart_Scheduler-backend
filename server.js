@@ -21,13 +21,30 @@ const app = express();
 // Middlewares
 app.use(express.json());
 
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://smart-scheduler-fontend.vercel.app',
+    'https://smart-scheduler-frontend.vercel.app'
+];
+
+if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 // CORS Configuration - Must come before helmet
 const corsOptions = {
-    origin: [
-        'http://localhost:3000',
-        'http://localhost:5173',
-        process.env.FRONTEND_URL || '*'
-    ],
+    origin: function (origin, callback) {
+        // allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            console.warn(`Origin blocked by CORS: ${origin}`);
+            callback(null, false); // Return false instead of throwing an error for better handling
+        }
+    },
     credentials: true,
     optionsSuccessStatus: 200,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
