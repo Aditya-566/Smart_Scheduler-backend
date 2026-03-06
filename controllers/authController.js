@@ -16,27 +16,42 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new Error('User already exists with that email or login ID');
     }
 
-    const user = await User.create({
-        name,
-        email,
-        loginId,
-        password,
-        role: role || 'STUDENT',
-        department
-    });
-
-    if (user) {
-        res.status(201).json({
-            _id: user._id,
-            name: user.name,
-            email: user.email,
-            loginId: user.loginId,
-            role: user.role,
-            token: user.getSignedJwtToken(),
+    try {
+        const user = await User.create({
+            name,
+            email,
+            loginId,
+            password,
+            role: role || 'STUDENT',
+            department
         });
-    } else {
-        res.status(400);
-        throw new Error('Invalid user data');
+
+        if (user) {
+            res.status(201).json({
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                loginId: user.loginId,
+                role: user.role,
+                token: user.getSignedJwtToken(),
+            });
+        } else {
+            res.status(400);
+            throw new Error('Invalid user data');
+        }
+    } catch (error) {
+        // Handle Mongoose validation errors
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(e => e.message).join(', ');
+            res.status(400);
+            throw new Error(messages);
+        }
+        // Handle duplicate key errors (e.g. loginId or email already exists in DB)
+        if (error.code === 11000) {
+            res.status(400);
+            throw new Error('A user with that email or login ID already exists.');
+        }
+        throw error;
     }
 });
 
