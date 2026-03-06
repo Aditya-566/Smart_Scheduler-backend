@@ -21,7 +21,15 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Please add a login ID'],
         unique: true,
-        sparse: true
+        validate: {
+            validator: function(v) {
+                if (this.role === 'ADMIN') return /^AD\d{5}$/.test(v);
+                if (this.role === 'FACULTY') return /^F\d{4}$/.test(v);
+                if (this.role === 'STUDENT') return /^SD\d{10}$/.test(v);
+                return false;
+            },
+            message: props => `${props.value} is not a valid login ID for the expected format (AD+5, F+4, SD+10)`
+        }
     },
     password: {
         type: String,
@@ -43,25 +51,6 @@ const userSchema = new mongoose.Schema({
     resetPasswordExpire: Date
 }, {
     timestamps: true
-});
-
-// Validate loginId format based on role
-userSchema.pre('validate', function (next) {
-    if (this.loginId && this.role) {
-        let valid = false;
-        if (this.role === 'ADMIN') valid = /^AD\d{5}$/.test(this.loginId);
-        else if (this.role === 'FACULTY') valid = /^F\d{4}$/.test(this.loginId);
-        else if (this.role === 'STUDENT') valid = /^SD\d{10}$/.test(this.loginId);
-        
-        if (!valid) {
-            const err = new Error(
-                `Login ID "${this.loginId}" is not valid for role ${this.role}. ` +
-                `Expected format: ADMIN=AD+5digits, FACULTY=F+4digits, STUDENT=SD+10digits`
-            );
-            return next(err);
-        }
-    }
-    next();
 });
 
 // Encrypt password using bcrypt

@@ -9,6 +9,10 @@ import connectDB from './config/db.js';
 import { notFound, errorHandler } from './middlewares/errorMiddleware.js';
 import authRoutes from './routes/authRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
+import courseRoutes from './routes/courseRoutes.js';
+import roomRoutes from './routes/roomRoutes.js';
+import departmentRoutes from './routes/departmentRoutes.js';
+import timeslotRoutes from './routes/timeslotRoutes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -68,6 +72,10 @@ if (process.env.NODE_ENV === 'development') {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use('/api/courses', courseRoutes);
+app.use('/api/rooms', roomRoutes);
+app.use('/api/departments', departmentRoutes);
+app.use('/api/timeslots', timeslotRoutes);
 
 // Basic route
 app.get('/', (req, res) => {
