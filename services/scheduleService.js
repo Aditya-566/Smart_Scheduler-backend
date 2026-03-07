@@ -71,13 +71,13 @@ export const generateAutoSchedule = async (departmentId, constraints = {}) => {
             }
             slotsByDay[slot.dayOfWeek].push(slot);
         });
-        
+
         // Track classes per day to enforce maxClassesPerDay per batch
-        const batchClassesPerDay = {}; 
-        
+        const batchClassesPerDay = {};
+
         // Track room bookings: roomId_timeSlotId
         const bookedRoomSlots = new Set();
-        
+
         // Track faculty bookings: facultyId_timeSlotId
         const bookedFacultySlots = new Set();
 
@@ -86,6 +86,11 @@ export const generateAutoSchedule = async (departmentId, constraints = {}) => {
 
         // Use batchInfo from constraints or generate from department
         const batchInfo = constraints.batchInfo || `Dept-${departmentId}`;
+
+        // Define break/lunch slots to skip (e.g., 12:00-13:00 is lunch)
+        const breakStartTimes = constraints.breakSlots || ['12:00'];
+        // Track consecutive classes per batch per day for forced gaps
+        const consecutiveTracker = {}; // key: batchInfo_day => count of consecutive classes
 
         for (const course of courses) {
             let scheduledCredits = 0;
@@ -102,10 +107,32 @@ export const generateAutoSchedule = async (departmentId, constraints = {}) => {
                 if (batchClassesPerDay[dayKey] >= maxPerDay) continue;
 
                 const dailySlots = slotsByDay[day];
-                
+
                 for (const slot of dailySlots) {
                     if (scheduledCredits >= course.credits) break;
                     if (batchClassesPerDay[dayKey] >= maxPerDay) break;
+
+                    // BREAK LOGIC: Skip lunch/break time slots
+                    if (breakStartTimes.includes(slot.startTime)) continue;
+
+                    // CONSECUTIVE LIMIT: After 2 consecutive classes, force a gap
+                    const consKey = `${batchInfo}_${day}`;
+                    const prevSlotIdx = dailySlots.indexOf(slot);
+                    if (prevSlotIdx > 0) {
+                        const prevSlot = dailySlots[prevSlotIdx - 1];
+                        const prevBatchKey = `${batchInfo}_${prevSlot._id}`;
+                        const prevPrevSlotIdx = prevSlotIdx - 1 > 0 ? prevSlotIdx - 2 : -1;
+
+                        // Check if the previous 2 consecutive slots were both scheduled for this batch
+                        if (bookedBatchSlots.has(prevBatchKey) && prevPrevSlotIdx >= 0) {
+                            const prevPrevSlot = dailySlots[prevPrevSlotIdx];
+                            const prevPrevBatchKey = `${batchInfo}_${prevPrevSlot._id}`;
+                            if (bookedBatchSlots.has(prevPrevBatchKey)) {
+                                // 2 consecutive classes already — skip this slot as a forced break
+                                continue;
+                            }
+                        }
+                    }
 
                     // Check batch+timeSlot conflict (CRITICAL: unique index requires only one class per batch per timeSlot)
                     const batchSlotKey = `${batchInfo}_${slot._id}`;
