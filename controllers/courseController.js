@@ -1,6 +1,16 @@
 import asyncHandler from 'express-async-handler';
 import Course from '../models/Course.js';
 
+// @desc    Get courses assigned to current faculty
+// @route   GET /api/courses/faculty/my-courses
+// @access  Private/Faculty
+export const getMyFacultyCourses = asyncHandler(async (req, res) => {
+    const courses = await Course.find({ faculty: req.user._id })
+        .populate('department', 'name code')
+        .populate('faculty', 'name email');
+    res.json(courses);
+});
+
 // @desc    Get all courses
 // @route   GET /api/courses
 // @access  Private
