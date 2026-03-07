@@ -13,12 +13,35 @@ import courseRoutes from './routes/courseRoutes.js';
 import roomRoutes from './routes/roomRoutes.js';
 import departmentRoutes from './routes/departmentRoutes.js';
 import timeslotRoutes from './routes/timeslotRoutes.js';
+import mongoose from 'mongoose';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 // Connect to database
 connectDB();
+
+// Auto-migrate: Drop old non-partial faculty index if it exists
+// The old index rejected null faculty values; the new partial index allows them
+const migrateIndexes = async () => {
+    try {
+        // Wait for connection
+        await mongoose.connection.asPromise();
+        const collection = mongoose.connection.collection('schedules');
+        const indexes = await collection.indexes();
+        const oldIndex = indexes.find(idx => idx.name === 'faculty_1_timeSlot_1' && !idx.partialFilterExpression);
+        if (oldIndex) {
+            await collection.dropIndex('faculty_1_timeSlot_1');
+            console.log('Migrated: Dropped old faculty_1_timeSlot_1 index (replaced with partial index)');
+        }
+    } catch (err) {
+        // Index may not exist yet, that's fine
+        if (err.code !== 27) { // 27 = IndexNotFound
+            console.warn('Index migration note:', err.message);
+        }
+    }
+};
+migrateIndexes();
 
 const app = express();
 
