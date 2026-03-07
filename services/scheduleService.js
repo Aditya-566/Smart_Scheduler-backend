@@ -81,6 +81,9 @@ export const generateAutoSchedule = async (departmentId, constraints = {}) => {
         // Track faculty bookings: facultyId_timeSlotId
         const bookedFacultySlots = new Set();
 
+        // Track batch bookings: batchInfo_timeSlotId (CRITICAL: prevent duplicate batch+timeSlot)
+        const bookedBatchSlots = new Set();
+
         // Use batchInfo from constraints or generate from department
         const batchInfo = constraints.batchInfo || `Dept-${departmentId}`;
 
@@ -103,6 +106,10 @@ export const generateAutoSchedule = async (departmentId, constraints = {}) => {
                 for (const slot of dailySlots) {
                     if (scheduledCredits >= course.credits) break;
                     if (batchClassesPerDay[dayKey] >= maxPerDay) break;
+
+                    // Check batch+timeSlot conflict (CRITICAL: unique index requires only one class per batch per timeSlot)
+                    const batchSlotKey = `${batchInfo}_${slot._id}`;
+                    if (bookedBatchSlots.has(batchSlotKey)) continue;
 
                     // Faculty conflict check (only for courses with assigned faculty)
                     const hasFaculty = course.faculty && course.faculty._id;
@@ -139,6 +146,7 @@ export const generateAutoSchedule = async (departmentId, constraints = {}) => {
                         }
 
                         newSchedules.push(scheduleEntry);
+                        bookedBatchSlots.add(batchSlotKey);
                         scheduledCredits++;
                         batchClassesPerDay[dayKey]++;
                     }
