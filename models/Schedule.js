@@ -14,7 +14,7 @@ const scheduleSchema = new mongoose.Schema({
     faculty: {
         type: mongoose.Schema.ObjectId,
         ref: 'User',
-        required: true
+        default: null
     },
     timeSlot: {
         type: mongoose.Schema.ObjectId,
@@ -33,8 +33,14 @@ const scheduleSchema = new mongoose.Schema({
 // 1. Prevent room double-booking
 scheduleSchema.index({ room: 1, timeSlot: 1 }, { unique: true });
 
-// 2. Prevent faculty overlap
-scheduleSchema.index({ faculty: 1, timeSlot: 1 }, { unique: true });
+// 2. Prevent faculty overlap (only when faculty is assigned)
+scheduleSchema.index(
+    { faculty: 1, timeSlot: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { faculty: { $type: 'objectId' } }
+    }
+);
 
 // 3. Prevent student batch overlap
 scheduleSchema.index({ batchInfo: 1, timeSlot: 1 }, { unique: true });
