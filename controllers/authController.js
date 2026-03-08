@@ -16,12 +16,17 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new Error('User already exists with that email or login ID');
     }
 
+    // SECURITY: Block ADMIN role during public self-registration
+    // Only allow STUDENT and FACULTY roles from public registration
+    const allowedRoles = ['STUDENT', 'FACULTY'];
+    const safeRole = allowedRoles.includes(role) ? role : 'STUDENT';
+
     const user = await User.create({
         name,
         email,
         loginId,
         password,
-        role: role || 'STUDENT',
+        role: safeRole,
         department
     });
 
