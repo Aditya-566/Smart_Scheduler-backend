@@ -89,100 +89,118 @@ export const generateAutoSchedule = async (departmentId, constraints = {}) => {
 
         // Define break/lunch slots to skip (e.g., 12:00-13:00 is lunch)
         const breakStartTimes = constraints.breakSlots || ['12:00'];
-        // Track consecutive classes per batch per day for forced gaps
-        const consecutiveTracker = {}; // key: batchInfo_day => count of consecutive classes
+        const maxPerDay = parseInt(constraints.maxClassesPerDay) || 4;
+        const days = Object.keys(slotsByDay).sort((a,b) => a-b);
+        
+        // Track course schedule state
+        let courseQueue = courses.map(c => ({
+            course: c,
+            remaining: c.credits,
+            scheduledToday: 0
+        }));
+        
+        let totalCreditsRemaining = courseQueue.reduce((acc, curr) => acc + curr.remaining, 0);
 
-        for (const course of courses) {
-            let scheduledCredits = 0;
-            const maxPerDay = parseInt(constraints.maxClassesPerDay) || 4;
+        for (const day of days) {
+            if (totalCreditsRemaining <= 0) break;
 
-            // Distribute across days
-            const days = Object.keys(slotsByDay);
+            courseQueue.forEach(item => { item.scheduledToday = 0; });
+            let batchClassesToday = 0;
+            let consecutiveClasses = 0;
+            const dailySlots = slotsByDay[day];
 
-            for (const day of days) {
-                if (scheduledCredits >= course.credits) break;
+            for (const slot of dailySlots) {
+                if (totalCreditsRemaining <= 0) break;
+                if (batchClassesToday >= maxPerDay) break;
 
-                const dayKey = `${batchInfo}_${day}`;
-                batchClassesPerDay[dayKey] = batchClassesPerDay[dayKey] || 0;
-                if (batchClassesPerDay[dayKey] >= maxPerDay) continue;
+                // BREAK LOGIC: Skip lunch/break time slots
+                if (breakStartTimes.includes(slot.startTime)) {
+                    consecutiveClasses = 0; // Reset consecutive counter after a scheduled break
+                    continue;
+                }
 
-                const dailySlots = slotsByDay[day];
+                // CONSECUTIVE LIMIT: After 2 consecutive classes, force a gap
+                if (consecutiveClasses >= 2) {
+                    consecutiveClasses = 0; // The forced gap counts as breaking the streak
+                    continue;
+                }
 
-                for (const slot of dailySlots) {
-                    if (scheduledCredits >= course.credits) break;
-                    if (batchClassesPerDay[dayKey] >= maxPerDay) break;
+                // Check batch+timeSlot conflict
+                const batchSlotKey = `${batchInfo}_${slot._id}`;
+                if (bookedBatchSlots.has(batchSlotKey)) {
+                    consecutiveClasses++;
+                    continue;
+                }
 
-                    // BREAK LOGIC: Skip lunch/break time slots
-                    if (breakStartTimes.includes(slot.startTime)) continue;
-
-                    // CONSECUTIVE LIMIT: After 2 consecutive classes, force a gap
-                    const consKey = `${batchInfo}_${day}`;
-                    const prevSlotIdx = dailySlots.indexOf(slot);
-                    if (prevSlotIdx > 0) {
-                        const prevSlot = dailySlots[prevSlotIdx - 1];
-                        const prevBatchKey = `${batchInfo}_${prevSlot._id}`;
-                        const prevPrevSlotIdx = prevSlotIdx - 1 > 0 ? prevSlotIdx - 2 : -1;
-
-                        // Check if the previous 2 consecutive slots were both scheduled for this batch
-                        if (bookedBatchSlots.has(prevBatchKey) && prevPrevSlotIdx >= 0) {
-                            const prevPrevSlot = dailySlots[prevPrevSlotIdx];
-                            const prevPrevBatchKey = `${batchInfo}_${prevPrevSlot._id}`;
-                            if (bookedBatchSlots.has(prevPrevBatchKey)) {
-                                // 2 consecutive classes already — skip this slot as a forced break
-                                continue;
-                            }
-                        }
+                // Sort courses: Priority 1: Least scheduled today. Priority 2: Highest remaining credits.
+                courseQueue.sort((a, b) => {
+                    if (a.scheduledToday !== b.scheduledToday) {
+                        return a.scheduledToday - b.scheduledToday; // Ascending: least scheduled first
                     }
+                    return b.remaining - a.remaining; // Descending: most remaining first
+                });
 
-                    // Check batch+timeSlot conflict (CRITICAL: unique index requires only one class per batch per timeSlot)
-                    const batchSlotKey = `${batchInfo}_${slot._id}`;
-                    if (bookedBatchSlots.has(batchSlotKey)) continue;
+                let selectedCourseItem = null;
+                let assignedRoom = null;
 
-                    // Faculty conflict check (only for courses with assigned faculty)
+                for (const item of courseQueue) {
+                    if (item.remaining <= 0) continue;
+                    
+                    const course = item.course;
                     const hasFaculty = course.faculty && course.faculty._id;
                     if (hasFaculty) {
                         const facultyIdStr = course.faculty._id.toString();
-                        const facultyBookingKey = `${facultyIdStr}_${slot._id}`;
-                        if (bookedFacultySlots.has(facultyBookingKey)) continue;
+                        if (bookedFacultySlots.has(`${facultyIdStr}_${slot._id}`)) continue;
                     }
 
                     // Find first available room
-                    let assignedRoom = null;
                     for (const room of rooms) {
                         const roomBookingKey = `${room._id}_${slot._id}`;
                         if (!bookedRoomSlots.has(roomBookingKey)) {
                             assignedRoom = room;
-                            bookedRoomSlots.add(roomBookingKey);
                             break;
                         }
                     }
 
                     if (assignedRoom) {
-                        const scheduleEntry = {
-                            course: course._id,
-                            room: assignedRoom._id,
-                            timeSlot: slot._id,
-                            batchInfo
-                        };
-
-                        // Only set faculty if the course has one assigned
-                        if (hasFaculty) {
-                            scheduleEntry.faculty = course.faculty._id;
-                            const facultyIdStr = course.faculty._id.toString();
-                            bookedFacultySlots.add(`${facultyIdStr}_${slot._id}`);
-                        }
-
-                        newSchedules.push(scheduleEntry);
-                        bookedBatchSlots.add(batchSlotKey);
-                        scheduledCredits++;
-                        batchClassesPerDay[dayKey]++;
+                        selectedCourseItem = item;
+                        break;
                     }
                 }
-            }
 
-            if (scheduledCredits < course.credits) {
-                throw new Error(`Not enough available slots/rooms for course "${course.name}" (needs ${course.credits} slots, got ${scheduledCredits}). Try adding more rooms or time slots.`);
+                if (selectedCourseItem && assignedRoom) {
+                    const course = selectedCourseItem.course;
+                    const scheduleEntry = {
+                        course: course._id,
+                        room: assignedRoom._id,
+                        timeSlot: slot._id,
+                        batchInfo
+                    };
+
+                    if (course.faculty && course.faculty._id) {
+                        scheduleEntry.faculty = course.faculty._id;
+                        bookedFacultySlots.add(`${course.faculty._id.toString()}_${slot._id}`);
+                    }
+
+                    newSchedules.push(scheduleEntry);
+                    bookedRoomSlots.add(`${assignedRoom._id}_${slot._id}`);
+                    bookedBatchSlots.add(batchSlotKey);
+
+                    selectedCourseItem.remaining--;
+                    selectedCourseItem.scheduledToday++;
+                    batchClassesToday++;
+                    totalCreditsRemaining--;
+                    consecutiveClasses++;
+                } else {
+                    // No course could be scheduled in this slot (likely room/faculty restriction)
+                    consecutiveClasses = 0; 
+                }
             }
+        }
+
+        if (totalCreditsRemaining > 0) {
+            const unscheduled = courseQueue.filter(c => c.remaining > 0).map(c => `${c.course.name} (${c.remaining} left)`).join(', ');
+            throw new Error(`Not enough available slots/rooms for some courses: ${unscheduled}. Try adding more rooms or time slots.`);
         }
 
         const inserted = await Schedule.insertMany(newSchedules, { session });
